@@ -15,9 +15,8 @@ def to_tokens(code):
   return [*tokenize.tokenize(readline)]
 
 
-def print_ast(code, indent=0, show_attrs=True, show_location=True):
+def print_ast(node, indent=0, show_attrs=True, show_location=True):
     """Pretty print AST tree structure with location info"""
-    node = to_AST(code)
     prefix = "  " * indent
     
     # Get node info
@@ -60,14 +59,15 @@ def print_ast(code, indent=0, show_attrs=True, show_location=True):
         is_last = (i == len(children) - 1)
         print_ast(child, indent + 1, show_attrs, show_location)
 
-def print_tokens(code):
-  for token in to_tokens(code):
+def print_tokens(tokens):
+  for token in tokens:
       token_name = tokenize.tok_name[token.type]
       print(f"Type: {token_name} ({token.type})"
             f" | Value: {repr(token.string)} "
             f" | Line: {token.start[0]}:{token.start[1]} .. {token.end[0]}:{token.end[1]}")
 
-# def make_sense(tokens, )
+def make_sense(tokens, node):
+  ...
 
 # ----------------------------------------------
 
@@ -79,5 +79,10 @@ def calculate(x, y):
     return result + 10
 """
 
-print_ast(code)
-print_tokens(code)
+tokens = to_tokens(code)
+root   = to_AST(code)
+
+print_ast(root)
+print_tokens(tokens)
+
+make_sense(tokens, root)
