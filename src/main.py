@@ -31,7 +31,7 @@ class BetterCode:
             return ("math", latex)
         
         def other(node):
-             return node
+             return ("other", node)
         
 # ----------------------------------------------
 
@@ -41,7 +41,6 @@ def test_match(node, rule):
         pat = rule[0]
         txt = node.value 
         res = re.match(pat, txt, re.DOTALL | re.MULTILINE)
-        print(":: ", txt, res, pat)
         return res
     
     else:
@@ -90,22 +89,16 @@ def to_IR(node, rules):
 def to_repr(ir_list):
     ret  = []
     for r in ir_list:
-        if isinstance(r, tuple):
-            kind, data = r
-            
-            if kind == "math":
-                latex = data
-                ret.append(latex)
-            
-            elif kind == "space":
-                ret.append(data)
-                
-            else:
-                raise f"{kind} is not defined"
+        kind, data = r
+        
+        if kind == "math":
+            ret.append(data)
+        
+        elif kind == "space":
+            ret.append(data)
             
         else:
-            node = r
-            ret.append(node.value)
+            ret.append(data.value)
             
             
     return "".join(ret)
@@ -130,20 +123,22 @@ if __name__ == "__main__":
     if a > 5:
         f__T = x * y
     """
-    code = textwrap.dedent(raw)
-    tree = parso.parse(code)
-
-    
     rules = build_rules_dict([
         # [score.]node, pattern, repl
-        ("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"${m.group(1)}_{m.group(2)}$"))
+        ("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{m.group(1)}_{m.group(2)}"))
     ])
     
-    ir  = to_IR(tree, rules)
-    out = to_repr(ir)
-
-    print(tree.dump())
-    print(ir)
-    print(out)
+    
+    code = textwrap.dedent(raw)
     print(code)
+
+    tree = parso.parse(code)
+    print(tree.dump())
+    
+    ir  = to_IR(tree, rules)
+    print(ir)
+    
+    out = to_repr(ir)
+    print(out)
+
     
