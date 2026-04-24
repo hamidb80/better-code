@@ -3,58 +3,114 @@ import re
 
 import parso
 
+
+class BetterCode:
+    class Node:
+        
+        # match node.type:
+        # file_input
+        # funcdef
+        # keyword 
+        # name 
+        # parameters 
+        # operator 
+        # param 
+        # suite 
+        # newline 
+        # simple_stmt 
+        # expr_stmt 
+        # term 
+        # trailer
+        # return_stmt 
+        # arith_expr 
+        # atom_expr
+        # number 
+        # endmarker 
+
+        def math(latex):
+            return ("math", latex)
+        
+        def other(node):
+             return node
+        
 # ----------------------------------------------
 
-def get_all_tokens(node):
-    tokens = []
-    if hasattr(node, 'children'):
-        for child in node.children:
-            tokens.extend(get_all_tokens(child))
+def test_match(node, rule):
+    
+    if node.type == "name":
+        pat = rule[0]
+        txt = node.value 
+        res = re.match(pat, txt, re.DOTALL | re.MULTILINE)
+        print(":: ", txt, res, pat)
+        return res
+    
     else:
-        tokens.append(node)
+        return False
+    
+def apply_rule(node, rule):
+    if node.type == "name":
+        pat, fn = rule
+        val = node.value
+        m = re.match(pat, val)
+        print(fn , m, f"'{val}'")
+        return fn(m)
         
-    # for token in tokens:
-    #     print(f"Token: {repr(token.value)}")
-    #     # print(f"  Start: {token.start_pos}")
-    #     # print(f"  End:   {token.end_pos}")
+    else:
+        return node
 
-    return tokens
-
-def to_repr(node, rules): 
+def to_IR(node, rules): 
     ret = []
     
-    # match node.type:
-    # file_input
-    # funcdef
-    # keyword 
-    # name 
-    # parameters 
-    # operator 
-    # param 
-    # suite 
-    # newline 
-    # simple_stmt 
-    # expr_stmt 
-    # term 
-    # trailer
-    # return_stmt 
-    # arith_expr 
-    # atom_expr
-    # number 
-    # endmarker 
-        
+    if hasattr(node, 'prefix'):
+        ret.append(("space", node.prefix))
     
     if hasattr(node, 'children'):
         for ch in node.children:
-            to_repr(ch, rules)
+            for r in to_IR(ch, rules):
+                ret.append(r)
 
     else:
-        rules.get(node.type, [])
-        node.value
-        
+        matches_rules = rules.get(node.type, [])
+        found = False
+        for mr in matches_rules:
+            if test_match(node, mr):
+                found = True
+                ret.append(apply_rule(node, mr))
+                break
+            else:
+                pass
+                
+            
+        if not found:
+            ret.append(BetterCode.Node.other(node))
+
+    return ret
     
-    
-    
+
+def to_repr(ir_list):
+    ret  = []
+    for r in ir_list:
+        if isinstance(r, tuple):
+            kind, data = r
+            
+            if kind == "math":
+                latex = data
+                ret.append(latex)
+            
+            elif kind == "space":
+                ret.append(data)
+                
+            else:
+                raise f"{kind} is not defined"
+            
+        else:
+            node = r
+            ret.append(node.value)
+            
+            
+    return "".join(ret)
+            
+
 def build_rules_dict(rules_list):
     ret = {}
     for r in rules_list:
@@ -67,43 +123,27 @@ def build_rules_dict(rules_list):
     return ret
 
 
-class BetterCode:
-    class Node:
-        # def keyword(kw):
-        #     return ("keyword", kw)
-        
-        # def name(n):
-        #     return ("name", n)
-        
-        # def number(n):
-        #     return ("number", n)
-            
-        def math(latex):
-            return ("math", latex)
-        
-        def token(node):
-            return ("node", node)
-        
 # ----------------------------------------------
 
 if __name__ == "__main__":
     raw  = """
-    def calculate(x, y):
-        a,b = x,y
-        result = x * y
-        result.val.a += 10
-        result[1] = 2
+    if a > 5:
+        f__T = x * y
     """
     code = textwrap.dedent(raw)
     tree = parso.parse(code)
 
-    print(tree.dump())
     
     rules = build_rules_dict([
         # [score.]node, pattern, repl
         ("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"${m.group(1)}_{m.group(2)}$"))
     ])
     
-    output = to_repr(tree, rules)
-    print(output)
-    print(rules)
+    ir  = to_IR(tree, rules)
+    out = to_repr(ir)
+
+    print(tree.dump())
+    print(ir)
+    print(out)
+    print(code)
+    
