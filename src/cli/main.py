@@ -85,6 +85,7 @@ def type_match(type, node):
         case "name":
             return node.type == "name"
         
+        # XXX chain of calls() and picks[] and dots. are inside one `atom_expr`
         case "call":
             return (node.type == "atom_expr")           and \
                    (node.children[0].type == "name")    and \
@@ -99,6 +100,7 @@ def type_match(type, node):
                    (node.children[1][0].value == "[")   and \
                    (node.children[1][2].value == "]")
                    
+        case "dot": ...
         case "paren": ...
         case "function": ...
         case "lambda": ...
@@ -223,6 +225,8 @@ def build_project(content, dest="./dist", title="better code"):
     shutil.copyfile("./node_modules/katex/dist/katex.min.css", f"{dest}/katex.min.css")
             
 # ----------------------------------------------
+
+# TODO write a matcher like clang-query
 
 if __name__ == "__main__":
     rules = [
