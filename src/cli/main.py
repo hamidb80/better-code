@@ -11,11 +11,19 @@ def readfile(path):
 # ----------------------------------------------
 
 class MatchRule:
-    def __init__(self, kind, pattern, replacer):
-        self.kind    = kind
+    kind    = None
+    
+class Name(MatchRule):
+    def __init__(self, pattern, replacer):
+        self.kind    = "name"
         self.pattern = pattern
         self.repl    = replacer
+
+class Call(MatchRule):
+    def __init__(self):
+        self.kind    = "call"
         
+      
 class BetterCode:
     class Node:
         
@@ -135,14 +143,37 @@ def to_html(ir_list):
             
             
     return "".join(ret)
+
+def build_project(content, dest="./dist", title="better code"):
+    with open(f"{dest}/index.html", "w") as f:
+        f.write(f"""
+        <!DOCTYPE html>
+            <html>
+            <head>
+                <link rel="stylesheet" href="/katex.min.css">
+                <script defer src="/katex.min.js"></script>
+                <script defer src="/script.js"></script>
+                
+                <title>{title}</title>
+            </head>
+            <body>
+            {content}
+            </body>
+        </html>
+        """)
+        
+    shutil.copyfile("./src/browser/script.js", f"{dest}/script.js")
+    shutil.copyfile("./node_modules/katex/dist/katex.min.js", f"{dest}/katex.min.js")
+    shutil.copyfile("./node_modules/katex/dist/katex.min.css", f"{dest}/katex.min.css")
             
 # ----------------------------------------------
 
 if __name__ == "__main__":
     raw  = readfile("./test/sample.py")
     rules = [
-        MatchRule("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
-        MatchRule("name", r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
+        Name(r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
+        Name(r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
+        Call(),
     ]
     
     
@@ -158,26 +189,4 @@ if __name__ == "__main__":
     out = to_html(ir)
     print(out)
 
-    
-    with open("./dist/index.html", "w") as f:
-        title = "better code"
-        
-        f.write(f"""
-        <!DOCTYPE html>
-            <html>
-            <head>
-                <link rel="stylesheet" href="/katex.min.css">
-                <script defer src="/katex.min.js"></script>
-                <script defer src="/script.js"></script>
-                
-                <title>{title}</title>
-            </head>
-            <body>
-            {out}
-            </body>
-        </html>
-        """)
-        
-    shutil.copyfile("./src/browser/script.js", "./dist/script.js")
-    shutil.copyfile("./node_modules/katex/dist/katex.min.js", "./dist/katex.min.js")
-    shutil.copyfile("./node_modules/katex/dist/katex.min.css", "./dist/katex.min.css")
+    build_project(out)
