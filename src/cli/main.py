@@ -62,6 +62,8 @@ class BetterCode:
         # atom_expr
         # number 
         # endmarker 
+        # string
+        # strings
 
         def math(latex):
             return ("math", latex)
@@ -156,7 +158,14 @@ def to_IR(node, rules):
                     ret.append(BetterCode.Node.math(escape_for_katex(node.value)))
 
                 case  "keyword":
-                    ret.append(BetterCode.Node.keyword(node))
+                    match node.value:
+                        case "or":
+                            ret.append(BetterCode.Node.math("\\vee"))
+                        case "and":
+                            ret.append(BetterCode.Node.math("\\wedge"))
+                        case _:
+                            ret.append(BetterCode.Node.keyword(node))
+                        
                     
                 case "operator":
                     match node.value:
@@ -164,6 +173,8 @@ def to_IR(node, rules):
                         case "<=": op = r"\leq"
                         case ">=": op = r"\geq"
                         case "=" : op = r"\gets"
+                        case "!=": op = r"\neq"
+                        case "==": op = r"="
                         case    _: op = None
                     
                     if op:
@@ -232,7 +243,11 @@ if __name__ == "__main__":
     rules = [
         Name(r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
         Name(r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
-        Call(),
+        # Kw("or", "\\vee"),
+        # Kw("and", "\\wedge"),
+        # Call("$1.dot($2)", "$1 \\cdot $2"),
+        # Call("$1.mul($2)", "$1 \\times $2"),
+        # Call("$1 / $2", "$1 \\div $2"),
     ]
     
     raw  = readfile("./test/sample.py")
