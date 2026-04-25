@@ -2,6 +2,7 @@ import textwrap
 import re
 
 import parso
+import shutil
 
 
 class BetterCode:
@@ -86,19 +87,19 @@ def to_IR(node, rules):
     return ret
     
 
-def to_repr(ir_list):
+def to_html(ir_list):
     ret  = []
     for r in ir_list:
         kind, data = r
         
         if kind == "math":
-            ret.append(data)
+            ret.append(f'<span class="latex">{data}</span>')
         
         elif kind == "space":
-            ret.append(data)
+            ret.append(f'<span class="space" style="margin-left: {len(data) * 3}px">{data}</span>')
             
         else:
-            ret.append(data.value)
+            ret.append(f'<span class="code">{data.value}</span>')
             
             
     return "".join(ret)
@@ -125,7 +126,7 @@ if __name__ == "__main__":
     """
     rules = build_rules_dict([
         # [score.]node, pattern, repl
-        ("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{m.group(1)}_{m.group(2)}"))
+        ("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}"))
     ])
     
     
@@ -138,7 +139,25 @@ if __name__ == "__main__":
     ir  = to_IR(tree, rules)
     print(ir)
     
-    out = to_repr(ir)
+    out = to_html(ir)
     print(out)
 
     
+    with open("./dist/index.html", "w") as f:
+        f.write(f"""
+        <!DOCTYPE html>
+            <html>
+            <head>
+                <link rel="stylesheet" href="/katex.min.css">
+                <script defer src="/katex.min.js"></script>
+                <script defer src="/script.js"></script>
+            </head>
+            <body>
+            {out}
+            </body>
+        </html>
+        """)
+        
+    shutil.copyfile("./src/browser/script.js", "./dist/script.js")
+    shutil.copyfile("./node_modules/katex/dist/katex.min.js", "./dist/katex.min.js")
+    shutil.copyfile("./node_modules/katex/dist/katex.min.css", "./dist/katex.min.css")
