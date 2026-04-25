@@ -160,6 +160,8 @@ if __name__ == "__main__":
 
     
     with open("./dist/index.html", "w") as f:
+        title = "better code"
+        
         f.write(f"""
         <!DOCTYPE html>
             <html>
@@ -168,7 +170,7 @@ if __name__ == "__main__":
                 <script defer src="/katex.min.js"></script>
                 <script defer src="/script.js"></script>
                 
-                <title>better code</title>
+                <title>{title}</title>
             </head>
             <body>
             {out}
