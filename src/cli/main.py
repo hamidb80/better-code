@@ -10,6 +10,12 @@ def readfile(path):
 
 # ----------------------------------------------
 
+class MatchRule:
+    def __init__(self, kind, pattern, replacer):
+        self.kind    = kind
+        self.pattern = pattern
+        self.repl    = replacer
+        
 class BetterCode:
     class Node:
         
@@ -54,17 +60,14 @@ def type_match(type, node):
         
         case _:
             return None
-    
 
-def apply_rule(node, rule):
-    kind, pat, fn = rule
-    
-    if type_match(kind, node):
+def apply_rule(rule: MatchRule, node):
+    if type_match(rule.kind, node):
         if node.type == "name":
             val = node.value
-            m = re.match(pat, val)
+            m = re.match(rule.pattern, val)
             if m:
-                return fn(m)
+                return rule.repl(m)
 
     return None
 
@@ -82,7 +85,7 @@ def to_IR(node, rules):
     else:
         found = False
         for rule in rules:
-            res = apply_rule(node, rule)
+            res = apply_rule(rule, node)
             if res:
                 found = True
                 ret.append(res)
@@ -133,27 +136,13 @@ def to_html(ir_list):
             
     return "".join(ret)
             
-
-# def build_rewrite_rules_dict(rules_list):
-#     ret = {}
-#     for r in rules_list:
-#         if r[0] not in ret:
-#             ret[r[0]] = []
-        
-#         # pattern = re.compile(r[1])
-#         ret[r[0]].append((r[1:]))
-        
-#     return ret
-
 # ----------------------------------------------
 
 if __name__ == "__main__":
     raw  = readfile("./test/sample.py")
     rules = [
-        # [score.]node, pattern, repl
-        ("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
-        ("name", r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
-        # ("call", r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}"))
+        MatchRule("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
+        MatchRule("name", r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
     ]
     
     
