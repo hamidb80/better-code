@@ -1,5 +1,6 @@
 import textwrap
 import re
+import os
 
 import shutil
 
@@ -297,6 +298,8 @@ def to_html(ir_list):
     return "".join(ret)
 
 def build_project(content, dest="./dist", title="better code"):
+    os.makedirs(dest, exist_ok=True)
+    
     with open(f"{dest}/index.html", "w") as f:
         f.write(f"""
         <!DOCTYPE html>
@@ -320,6 +323,8 @@ def build_project(content, dest="./dist", title="better code"):
     shutil.copyfile("./src/browser/style.css", f"{dest}/style.css")
     shutil.copyfile("./node_modules/katex/dist/katex.min.js", f"{dest}/katex.min.js")
     shutil.copyfile("./node_modules/katex/dist/katex.min.css", f"{dest}/katex.min.css")
+    
+    print(f"\n:: now serve a simple http server at {dest} ::")
             
 # ----------------------------------------------
 
