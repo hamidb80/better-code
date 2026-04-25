@@ -5,6 +5,7 @@ import shutil
 
 import parso
 from   parso.tree import Leaf, Node
+from parso.python.tree import Name, Operator
 
 # Node('term', [my_name, Leaf('operator', '=', (1, 0), ' '), Leaf('number', '10', (1, 0), ' ')])
 
@@ -98,8 +99,10 @@ class BetterCode:
         
 # ----------------------------------------------
 
-def type_match_where(type, node):
+def type_match_where(type, node, info=None):
     # TODO return more information for complex nodes such as index
+    
+    # print(type, node.type)
     
     match type:
         case "name":
@@ -122,8 +125,34 @@ def type_match_where(type, node):
         case "dot": 
             return node.type == "atom_expr"
         
+        case "__dot": 
+            return \
+                node.type              == 'trailer'  and \
+                node.children[0].type  == 'operator' and \
+                node.children[0].value == '.'        and \
+                node.children[1].type  == 'name'
+        
+        case "operator":
+            return node.type  == 'operator'
+                
+        case "operator=":
+            return node.type  == 'operator' and \
+                   node.value == info
+                
+        case "__callparen": 
+            return \
+                node.type     == 'trailer'  and \
+                type_match_where('operator=', node.children[0] , '(') and \
+                type_match_where('operator=', node.children[-1], ')')
+        
         case "method":
-            return node.type == "atom_expr"
+            if node.type == "atom_expr":
+                print(node.dump())
+                for i in range(2, len(node.children)):
+                    if type_match_where('__dot',       node.children[i-1]) and \
+                       type_match_where('__callparen', node.children[i  ]) :
+                        return i
+                        
         
         case "tuple":
             return node.type == "atom"
@@ -157,81 +186,90 @@ def type_match_where(type, node):
     return None
 
 def apply_rule(rule: MatchRule, node):
-    if type_match_where(rule.kind, node):
+    # print(node.type, rule.kind)
+    
+    if ret := type_match_where(rule.kind, node):
         
-        if node.type == "name":
-            val = node.value
-            m = re.match(rule.pattern, val)
-            if m:
-                return rule.repl(m)
+        match rule.kind:
+            case "name":
+                val = node.value
+                m = re.match(rule.pattern, val)
+                if m:
+                    return rule.repl(m)
+        
+            case "method":
+                dot_i  = ret - 1
+                call_i = ret
+                repl_nodes = rule.repl(Node('atom_expr', node.children[:dot_i]), node.children[call_i].children[1:-1])
+                node.children = [*repl_nodes, *node.children[call_i+1:]]
 
     return None
 
 def to_IR(node, rules): 
     ret = []
+    is_leaf = not hasattr(node, 'children')
     
     if hasattr(node, 'prefix'):
         ret.append(("space", node.prefix))
+
+    found = False
+    for rule in rules:
+        if res := apply_rule(rule, node):
+            found = True
+            ret.append(res)
+            break
+        else:
+            pass
+            
     
-    if hasattr(node, 'children'):
+    if not is_leaf:
         for ch in node.children:
             for r in to_IR(ch, rules):
                 ret.append(r)
+        
+    if not found and is_leaf:
+        match node.type:
+            case "newline":
+                ret.append(BetterCode.Node.newline())
 
-    else:
-        found = False
-        for rule in rules:
-            res = apply_rule(rule, node)
-            if res:
-                found = True
-                ret.append(res)
-                break
-            else:
-                pass
-                
+            case "string":
+                ret.append(BetterCode.Node.string(node))
             
-        if not found:
-            match node.type:
-                case "newline":
-                    ret.append(BetterCode.Node.newline())
+            case  "name":
+                ret.append(BetterCode.Node.math(escape_for_katex(node.value)))
+            
+            case  "number":
+                ret.append(BetterCode.Node.math(escape_for_katex(node.value)))
 
-                case "string":
-                    ret.append(BetterCode.Node.string(node))
-                
-                case  "name":
-                    ret.append(BetterCode.Node.math(escape_for_katex(node.value)))
-                
-                case  "number":
-                    ret.append(BetterCode.Node.math(escape_for_katex(node.value)))
-
-                case  "keyword":
-                    match node.value:
-                        case "or":
-                            ret.append(BetterCode.Node.math("\\vee"))
-                        case "and":
-                            ret.append(BetterCode.Node.math("\\wedge"))
-                        case _:
-                            ret.append(BetterCode.Node.keyword(node))
-                
-                case "operator":
-                    match node.value:
-                        case "*" : op = r"\times"
-                        case "<=": op = r"\leq"
-                        case ">=": op = r"\geq"
-                        case "=" : op = r"\gets"
-                        case "!=": op = r"\neq"
-                        case "==": op = r"="
-                        case    _: op = None
+            case  "keyword":
+                match node.value:
+                    case "or":
+                        ret.append(BetterCode.Node.math("\\vee"))
+                    case "and":
+                        ret.append(BetterCode.Node.math("\\wedge"))
+                    case _:
+                        ret.append(BetterCode.Node.keyword(node))
+            
+            case "operator":
+                match node.value:
+                    case "*" : op = r"\times"
+                    case "<=": op = r"\leq"
+                    case ">=": op = r"\geq"
+                    case "=" : op = r"\gets"
+                    case "!=": op = r"\neq"
+                    case "==": op = r"="
+                    case    _: op = None
                     
-                    if op:
-                        ret.append(BetterCode.Node.math(op))
-                    else:
-                        ret.append(BetterCode.Node.other(node))
-                    
-                # case "atom_expr": ...
-                    
-                case _:
+                if node.value[0] == '$':
+                    op = node.value.strip('$')
+                
+                if op:
+                    ret.append(BetterCode.Node.math(op))
+                else:
                     ret.append(BetterCode.Node.other(node))
+                
+            case _:
+                ret.append(BetterCode.Node.other(node))
 
     return ret
     
@@ -287,13 +325,21 @@ def build_project(content, dest="./dist", title="better code"):
 
 # TODO write a matcher like clang-query
 
+def mm1(obj, args):
+    args[0].prefix=" "
+    return [Node('term', [obj, Operator(r'$\cdot$', (1, 0), " "), args[0]])]
+
+def mm2(obj, args):
+    args[0].prefix=" "
+    return [Node('term', [obj, Operator(r'$\times$', (1, 0), " "), args[0]])]
+
 if __name__ == "__main__":
     rules = [
         Name(r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
         Name(r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
 
-        Method("dot", lambda obj, args: [Node('term', [obj, Leaf('operator', r'\cdot', (1, 0), ' '), args.children[0]])]),
-        # Method("mul"),
+        Method("dot", mm1),
+        Method("mul", mm2),
         
         # Kw("or", "\\vee"),
         # Kw("and", "\\wedge"),
