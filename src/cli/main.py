@@ -36,6 +36,10 @@ class Name(MatchRule):
         self.pattern = pattern
         self.repl    = replacer
 
+class Method      (MatchRule):
+    def __init__(self):
+        self.kind    = "call"
+
 class Call(MatchRule):
     def __init__(self):
         self.kind    = "call"
@@ -95,7 +99,7 @@ def type_match(type, node):
                    (node.children[1][0].value == "(")   and \
                    (node.children[1][2].value == ")")
         
-        case "pick":
+        case "pick": # bracket expr
             return (node.type == "atom_expr")           and \
                    (node.children[0].type == "name")    and \
                    (node.children[1].type == "trailer") and \
@@ -103,8 +107,10 @@ def type_match(type, node):
                    (node.children[1][2].value == "]")
                    
         case "dot": ...
+        case "method": ...
         case "paren": ...
-        case "function": ...
+        
+        case "defn": ...
         case "lambda": ...
         case _: ...
         
@@ -243,6 +249,8 @@ if __name__ == "__main__":
     rules = [
         Name(r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
         Name(r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
+        Method("dot"),
+        Method("mul"),
         # Kw("or", "\\vee"),
         # Kw("and", "\\wedge"),
         # Call("$1.dot($2)", "$1 \\cdot $2"),
