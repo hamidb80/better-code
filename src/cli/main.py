@@ -4,6 +4,11 @@ import re
 import parso
 import shutil
 
+def readfile(path):
+    with open(path, 'r') as f:
+        return f.read()
+
+# ----------------------------------------------
 
 class BetterCode:
     class Node:
@@ -39,13 +44,27 @@ class BetterCode:
         
 # ----------------------------------------------
 
+def type_match(type, node):
+    match type:
+        case "name":
+            return node.type == "name"
+        
+        case "call":
+            return None
+        
+        case _:
+            return None
+    
+
 def apply_rule(node, rule):
-    if node.type == "name":
-        kind, pat, fn = rule
-        val = node.value
-        m = re.match(pat, val)
-        if m:
-            return fn(m)
+    kind, pat, fn = rule
+    
+    if type_match(kind, node):
+        if node.type == "name":
+            val = node.value
+            m = re.match(pat, val)
+            if m:
+                return fn(m)
 
     return None
 
@@ -126,16 +145,10 @@ def to_html(ir_list):
         
 #     return ret
 
-
 # ----------------------------------------------
 
 if __name__ == "__main__":
-    raw  = """
-    if a >= 5:
-        f__T = delta_h * y
-        call(1, 2, 3)
-        bracket[1, 2, 3]
-    """
+    raw  = readfile("./test/sample.py")
     rules = [
         # [score.]node, pattern, repl
         ("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
