@@ -1,8 +1,14 @@
 import textwrap
 import re
 
-import parso
 import shutil
+
+import parso
+from   parso.tree import Leaf, Node
+
+# Node('term', [my_name, Leaf('operator', '=', (1, 0), ' '), Leaf('number', '10', (1, 0), ' ')])
+
+# ----------------------------------------------
 
 def readfile(path):
     with open(path, 'r') as f:
@@ -25,6 +31,7 @@ def escape_for_katex(text):
     for char, latex_char in replacements.items():
         text = text.replace(char, latex_char)
     return text
+
 # ----------------------------------------------
 
 class MatchRule:
@@ -36,13 +43,17 @@ class Name(MatchRule):
         self.pattern = pattern
         self.repl    = replacer
 
-class Method      (MatchRule):
-    def __init__(self):
-        self.kind    = "call"
+class Method(MatchRule):
+    def __init__(self, callee, repl):
+        self.kind    = "method"
+        self.callee  = callee
+        self.repl    = repl
 
 class Call(MatchRule):
-    def __init__(self):
+    def __init__(self, callee, repl):
         self.kind    = "call"
+        self.callee  = callee
+        self.repl    = repl
 
 class BetterCode:
     class Node:
@@ -63,6 +74,7 @@ class BetterCode:
         # trailer
         # return_stmt 
         # arith_expr 
+        # testlist_comp
         # atom_expr
         # number 
         # endmarker 
@@ -87,11 +99,12 @@ class BetterCode:
 # ----------------------------------------------
 
 def type_match(type, node):
+    # TODO return more information for complex nodes such as index
+    
     match type:
         case "name":
             return node.type == "name"
         
-        # XXX chain of calls() and picks[] and dots. are inside one `atom_expr`
         case "call":
             return (node.type == "atom_expr")           and \
                    (node.children[0].type == "name")    and \
@@ -106,18 +119,46 @@ def type_match(type, node):
                    (node.children[1][0].value == "[")   and \
                    (node.children[1][2].value == "]")
                    
-        case "dot": ...
-        case "method": ...
-        case "paren": ...
+        case "dot": 
+            return node.type == "atom_expr"
+        
+        case "method":
+            return node.type == "atom_expr"
+        
+        case "tuple":
+            return node.type == "atom"
+
+        case "paren":
+            return node.type == "atom"
+
+        case "list":
+            return node.type == "atom"
         
         case "defn": ...
         case "lambda": ...
+        
+        case "class": ...
+        
+        case "if": ...
+        case "elif": ...
+        case "else": ...
+        
+        case "match": ...
+        case "case": ...
+        
+        case "for": ...
+        case "while": ...
+        
+        case "import": ...
+        case "return": ...
+        
         case _: ...
         
     return None
 
 def apply_rule(rule: MatchRule, node):
     if type_match(rule.kind, node):
+        
         if node.type == "name":
             val = node.value
             m = re.match(rule.pattern, val)
@@ -171,8 +212,7 @@ def to_IR(node, rules):
                             ret.append(BetterCode.Node.math("\\wedge"))
                         case _:
                             ret.append(BetterCode.Node.keyword(node))
-                        
-                    
+                
                 case "operator":
                     match node.value:
                         case "*" : op = r"\times"
@@ -187,6 +227,8 @@ def to_IR(node, rules):
                         ret.append(BetterCode.Node.math(op))
                     else:
                         ret.append(BetterCode.Node.other(node))
+                    
+                # case "atom_expr": ...
                     
                 case _:
                     ret.append(BetterCode.Node.other(node))
@@ -249,13 +291,12 @@ if __name__ == "__main__":
     rules = [
         Name(r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
         Name(r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
-        Method("dot"),
-        Method("mul"),
+
+        Method("dot", lambda obj, args: [Node('term', [obj, Leaf('operator', r'\cdot', (1, 0), ' '), args.children[0]])]),
+        # Method("mul"),
+        
         # Kw("or", "\\vee"),
         # Kw("and", "\\wedge"),
-        # Call("$1.dot($2)", "$1 \\cdot $2"),
-        # Call("$1.mul($2)", "$1 \\times $2"),
-        # Call("$1 / $2", "$1 \\div $2"),
     ]
     
     raw  = readfile("./test/sample.py")
