@@ -22,8 +22,11 @@ class Name(MatchRule):
 class Call(MatchRule):
     def __init__(self):
         self.kind    = "call"
-        
-      
+
+class Call(MatchRule):
+    def __init__(self):
+        self.kind    = "call"
+
 class BetterCode:
     class Node:
         
@@ -52,6 +55,12 @@ class BetterCode:
         
         def newline():
             return ("newline", None)
+        
+        def keyword(node):
+            return ("keyword", node)
+
+        def string(node):
+            return ("string", node)
         
         def other(node):
              return ("other", node)
@@ -103,23 +112,31 @@ def to_IR(node, rules):
                 
             
         if not found:
-            if node.type == "newline":
-                ret.append(BetterCode.Node.newline())
+            match node.type:
+                case "newline":
+                    ret.append(BetterCode.Node.newline())
 
-            elif node.type == "operator":
-                if   node.value == "*" : op = r"\times"
-                elif node.value == "<=": op = r"\leq"
-                elif node.value == ">=": op = r"\geq"
-                elif node.value == "=": op = r"\gets"
-                else: op = None
+                case "string":
+                    ret.append(BetterCode.Node.string(node))
                 
-                if op:
-                    ret.append(BetterCode.Node.math(op))
-                else:
-                    ret.append(BetterCode.Node.other(node))
+                case  "keyword":
+                    ret.append(BetterCode.Node.keyword(node))
                     
-            else:
-                ret.append(BetterCode.Node.other(node))
+                case "operator":
+                    match node.value:
+                        case "*" : op = r"\times"
+                        case "<=": op = r"\leq"
+                        case ">=": op = r"\geq"
+                        case "=" : op = r"\gets"
+                        case    _: op = None
+                    
+                    if op:
+                        ret.append(BetterCode.Node.math(op))
+                    else:
+                        ret.append(BetterCode.Node.other(node))
+                    
+                case _:
+                    ret.append(BetterCode.Node.other(node))
 
     return ret
     
@@ -129,17 +146,19 @@ def to_html(ir_list):
     for r in ir_list:
         kind, data = r
         
-        if kind == "math":
-            ret.append(f'<span class="latex">{data}</span>')
-        
-        elif kind == "space":
-            ret.append(f'<span class="space" style="margin-left: {len(data) * 6}px">{data}</span>')
-            
-        elif kind == "newline":
-            ret.append("<br>")
-            
-        else:
-            ret.append(f'<span class="code">{data.value}</span>')
+        match kind:
+            case "space":
+                ret.append(f'<span class="space" style="margin-left: {len(data) * 6}px">{data}</span>')
+            case "newline":
+                ret.append("<br>")
+            case "keyword":
+                ret.append(f'<span class="keyword">{data.value}</span>')
+            case "math":
+                ret.append(f'<span class="latex">{data}</span>')
+            case "string":
+                ret.append(f'<span class="string">{data.value}</span>')
+            case _:
+                ret.append(f'<span class="code">{data.value}</span>')
             
             
     return "".join(ret)
@@ -152,6 +171,8 @@ def build_project(content, dest="./dist", title="better code"):
             <head>
                 <link rel="stylesheet" href="/katex.min.css">
                 <script defer src="/katex.min.js"></script>
+                
+                <link rel="stylesheet" href="/style.css">
                 <script defer src="/script.js"></script>
                 
                 <title>{title}</title>
@@ -163,20 +184,20 @@ def build_project(content, dest="./dist", title="better code"):
         """)
         
     shutil.copyfile("./src/browser/script.js", f"{dest}/script.js")
+    shutil.copyfile("./src/browser/style.css", f"{dest}/style.css")
     shutil.copyfile("./node_modules/katex/dist/katex.min.js", f"{dest}/katex.min.js")
     shutil.copyfile("./node_modules/katex/dist/katex.min.css", f"{dest}/katex.min.css")
             
 # ----------------------------------------------
 
 if __name__ == "__main__":
-    raw  = readfile("./test/sample.py")
     rules = [
         Name(r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
         Name(r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
         Call(),
     ]
     
-    
+    raw  = readfile("./test/sample.py")
     code = textwrap.dedent(raw)
     print(code)
 
