@@ -8,6 +8,23 @@ def readfile(path):
     with open(path, 'r') as f:
         return f.read()
 
+def escape_for_katex(text):
+    replacements = {
+        '\\': '\\\\',
+        '{': '\\{',
+        '}': '\\}',
+        '_': '\\_',
+        '&': '\\&',
+        '%': '\\%',
+        '$': '\\$',
+        '#': '\\#',
+        '^': '\\^{}',
+        '~': '\\textasciitilde{}',
+    }
+    
+    for char, latex_char in replacements.items():
+        text = text.replace(char, latex_char)
+    return text
 # ----------------------------------------------
 
 class MatchRule:
@@ -18,10 +35,6 @@ class Name(MatchRule):
         self.kind    = "name"
         self.pattern = pattern
         self.repl    = replacer
-
-class Call(MatchRule):
-    def __init__(self):
-        self.kind    = "call"
 
 class Call(MatchRule):
     def __init__(self):
@@ -73,10 +86,25 @@ def type_match(type, node):
             return node.type == "name"
         
         case "call":
-            return None
+            return (node.type == "atom_expr")           and \
+                   (node.children[0].type == "name")    and \
+                   (node.children[1].type == "trailer") and \
+                   (node.children[1][0].value == "(")   and \
+                   (node.children[1][2].value == ")")
         
-        case _:
-            return None
+        case "pick":
+            return (node.type == "atom_expr")           and \
+                   (node.children[0].type == "name")    and \
+                   (node.children[1].type == "trailer") and \
+                   (node.children[1][0].value == "[")   and \
+                   (node.children[1][2].value == "]")
+                   
+        case "paren": ...
+        case "function": ...
+        case "lambda": ...
+        case _: ...
+        
+    return None
 
 def apply_rule(rule: MatchRule, node):
     if type_match(rule.kind, node):
@@ -119,6 +147,12 @@ def to_IR(node, rules):
                 case "string":
                     ret.append(BetterCode.Node.string(node))
                 
+                case  "name":
+                    ret.append(BetterCode.Node.math(escape_for_katex(node.value)))
+                
+                case  "number":
+                    ret.append(BetterCode.Node.math(escape_for_katex(node.value)))
+
                 case  "keyword":
                     ret.append(BetterCode.Node.keyword(node))
                     
@@ -208,6 +242,4 @@ if __name__ == "__main__":
     print(ir)
     
     out = to_html(ir)
-    print(out)
-
     build_project(out)
