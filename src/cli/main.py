@@ -98,14 +98,14 @@ class BetterCode:
         
 # ----------------------------------------------
 
-def type_match(type, node):
+def type_match_where(type, node):
     # TODO return more information for complex nodes such as index
     
     match type:
         case "name":
             return node.type == "name"
         
-        case "call":
+        case "call": # function call
             return (node.type == "atom_expr")           and \
                    (node.children[0].type == "name")    and \
                    (node.children[1].type == "trailer") and \
@@ -157,7 +157,7 @@ def type_match(type, node):
     return None
 
 def apply_rule(rule: MatchRule, node):
-    if type_match(rule.kind, node):
+    if type_match_where(rule.kind, node):
         
         if node.type == "name":
             val = node.value
