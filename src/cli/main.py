@@ -147,7 +147,6 @@ def type_match_where(type, node, info=None):
         
         case "method":
             if node.type == "atom_expr":
-                print(node.dump())
                 for i in range(2, len(node.children)):
                     if type_match_where('__dot',       node.children[i-1]) and \
                        type_match_where('__callparen', node.children[i  ]) :
@@ -200,8 +199,9 @@ def apply_rule(rule: MatchRule, node):
             case "method":
                 dot_i  = ret - 1
                 call_i = ret
-                repl_nodes = rule.repl(Node('atom_expr', node.children[:dot_i]), node.children[call_i].children[1:-1])
-                node.children = [*repl_nodes, *node.children[call_i+1:]]
+                if node.children[dot_i].children[1].value == rule.callee:
+                    repl_nodes = rule.repl(Node('atom_expr', node.children[:dot_i]), node.children[call_i].children[1:-1])
+                    node.children = [*repl_nodes, *node.children[call_i+1:]]
 
     return None
 
@@ -325,12 +325,20 @@ def build_project(content, dest="./dist", title="better code"):
 
 # TODO write a matcher like clang-query
 
+def add_prefix(node):
+    is_leaf = not hasattr(node, 'children')
+    
+    if is_leaf:
+        node.prefix = " " + node.prefix
+    else:
+        add_prefix(node.children[0])
+
 def mm1(obj, args):
-    args[0].prefix=" "
+    add_prefix(args[0])
     return [Node('term', [obj, Operator(r'$\cdot$', (1, 0), " "), args[0]])]
 
 def mm2(obj, args):
-    args[0].prefix=" "
+    add_prefix(args[0])
     return [Node('term', [obj, Operator(r'$\times$', (1, 0), " "), args[0]])]
 
 if __name__ == "__main__":
