@@ -31,32 +31,23 @@ class BetterCode:
         def math(latex):
             return ("math", latex)
         
+        def newline():
+            return ("newline", None)
+        
         def other(node):
              return ("other", node)
         
 # ----------------------------------------------
 
-def test_match(node, rule):
-    
-    if node.type == "name":
-        pat = rule[0]
-        txt = node.value 
-        res = re.match(pat, txt, re.DOTALL | re.MULTILINE)
-        return res
-    
-    else:
-        return False
-    
 def apply_rule(node, rule):
     if node.type == "name":
-        pat, fn = rule
+        kind, pat, fn = rule
         val = node.value
         m = re.match(pat, val)
-        print(fn , m, f"'{val}'")
-        return fn(m)
-        
-    else:
-        return node
+        if m:
+            return fn(m)
+
+    return None
 
 def to_IR(node, rules): 
     ret = []
@@ -70,19 +61,35 @@ def to_IR(node, rules):
                 ret.append(r)
 
     else:
-        matches_rules = rules.get(node.type, [])
         found = False
-        for mr in matches_rules:
-            if test_match(node, mr):
+        for rule in rules:
+            res = apply_rule(node, rule)
+            if res:
                 found = True
-                ret.append(apply_rule(node, mr))
+                ret.append(res)
                 break
             else:
                 pass
                 
             
         if not found:
-            ret.append(BetterCode.Node.other(node))
+            if node.type == "newline":
+                ret.append(BetterCode.Node.newline())
+
+            elif node.type == "operator":
+                if   node.value == "*" : op = r"\times"
+                elif node.value == "<=": op = r"\leq"
+                elif node.value == ">=": op = r"\geq"
+                elif node.value == "=": op = r"\gets"
+                else: op = None
+                
+                if op:
+                    ret.append(BetterCode.Node.math(op))
+                else:
+                    ret.append(BetterCode.Node.other(node))
+                    
+            else:
+                ret.append(BetterCode.Node.other(node))
 
     return ret
     
@@ -96,7 +103,10 @@ def to_html(ir_list):
             ret.append(f'<span class="latex">{data}</span>')
         
         elif kind == "space":
-            ret.append(f'<span class="space" style="margin-left: {len(data) * 3}px">{data}</span>')
+            ret.append(f'<span class="space" style="margin-left: {len(data) * 6}px">{data}</span>')
+            
+        elif kind == "newline":
+            ret.append("<br>")
             
         else:
             ret.append(f'<span class="code">{data.value}</span>')
@@ -105,29 +115,33 @@ def to_html(ir_list):
     return "".join(ret)
             
 
-def build_rules_dict(rules_list):
-    ret = {}
-    for r in rules_list:
-        if r[0] not in ret:
-            ret[r[0]] = []
+# def build_rewrite_rules_dict(rules_list):
+#     ret = {}
+#     for r in rules_list:
+#         if r[0] not in ret:
+#             ret[r[0]] = []
         
-        # pattern = re.compile(r[1])
-        ret[r[0]].append((r[1:]))
+#         # pattern = re.compile(r[1])
+#         ret[r[0]].append((r[1:]))
         
-    return ret
+#     return ret
 
 
 # ----------------------------------------------
 
 if __name__ == "__main__":
     raw  = """
-    if a > 5:
-        f__T = x * y
+    if a >= 5:
+        f__T = delta_h * y
+        call(1, 2, 3)
+        bracket[1, 2, 3]
     """
-    rules = build_rules_dict([
+    rules = [
         # [score.]node, pattern, repl
-        ("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}"))
-    ])
+        ("name", r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
+        ("name", r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
+        # ("call", r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}"))
+    ]
     
     
     code = textwrap.dedent(raw)
@@ -151,6 +165,8 @@ if __name__ == "__main__":
                 <link rel="stylesheet" href="/katex.min.css">
                 <script defer src="/katex.min.js"></script>
                 <script defer src="/script.js"></script>
+                
+                <title>better code</title>
             </head>
             <body>
             {out}
