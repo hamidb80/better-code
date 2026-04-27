@@ -1,5 +1,7 @@
 
 def calc():
+    firefox_path = "..."
+    mouse_position = {'x': 32, 'y': 100}
     if a >= 5 or b == 3 and c < 0:
         f__T = delta_h * y
         mat1.dot((mat2.mul(mat3)))

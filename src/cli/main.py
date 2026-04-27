@@ -5,10 +5,8 @@ import os
 import shutil
 
 import parso
-from   parso.tree import Leaf, Node
+from   parso.tree import Leaf, Node, NodeOrLeaf
 from parso.python.tree import Name, Operator
-
-# Node('term', [my_name, Leaf('operator', '=', (1, 0), ' '), Leaf('number', '10', (1, 0), ' ')])
 
 # ----------------------------------------------
 
@@ -82,6 +80,12 @@ class BetterCode:
         # endmarker 
         # string
         # strings
+
+        def text(data):
+            return ("text", data)
+
+        def img(path):
+            return ("img", path)
 
         def math(latex):
             return ("math", latex)
@@ -185,7 +189,7 @@ def type_match_where(type, node, info=None):
         
     return None
 
-def apply_rule(rule: MatchRule, node):
+def apply_rule(rule: MatchRule, node, parent, index):
     # print(node.type, rule.kind)
     
     if ret := type_match_where(rule.kind, node):
@@ -206,7 +210,7 @@ def apply_rule(rule: MatchRule, node):
 
     return None
 
-def to_IR(node, rules): 
+def to_IR(node, rules, parent, index): 
     ret = []
     is_leaf = not hasattr(node, 'children')
     
@@ -215,19 +219,20 @@ def to_IR(node, rules):
 
     found = False
     for rule in rules:
-        if res := apply_rule(rule, node):
+        if res := apply_rule(rule, node, parent, index):
             found = True
-            ret.append(res)
+            for r in res:
+                ret.append(r)
             break
-        else:
-            pass
-            
     
     if not is_leaf:
-        for ch in node.children:
-            for r in to_IR(ch, rules):
+        i = 0
+        while i < len(node.children):
+            for r in to_IR(node.children[i], rules, node, i):
                 ret.append(r)
+            i += 1
         
+            
     if not found and is_leaf:
         match node.type:
             case "newline":
@@ -278,35 +283,40 @@ def to_IR(node, rules):
 def to_html(ir_list):
     ret  = []
     for r in ir_list:
-        kind, data = r
-        
-        match kind:
-            case "space":
-                ret.append(f'<span class="space" style="margin-left: {len(data) * 6}px">{data}</span>')
-            case "newline":
-                ret.append("<br>")
-            case "keyword":
-                ret.append(f'<span class="keyword">{data.value}</span>')
-            case "math":
-                ret.append(f'<span class="latex">{data}</span>')
-            case "string":
-                ret.append(f'<span class="string">{data.value}</span>')
-            case _:
-                ret.append(f'<span class="code">{data.value}</span>')
+            # print(">> ", r)
+            kind, data = r
             
+            match kind:
+                case "space":
+                    ret.append(f'<span class="space" style="margin-left: {len(data) * 6}px">{data}</span>')
+                case "newline":
+                    ret.append("<br>")
+                case "img":
+                    ret.append(f'<img class="inline-img" height="20" src="/assets/{data}"/>')
+                case "keyword":
+                    ret.append(f'<span class="keyword">{data.value}</span>')
+                case "math":
+                    ret.append(f'<span class="latex">{data}</span>')
+                case "string":
+                    ret.append(f'<span class="string">{data.value}</span>')
+                case "text":
+                    ret.append(f'<span class="text">{data}</span>')
+                case _:
+                    ret.append(f'<span class="code">{data.value}</span>')
+                
             
     return "".join(ret)
 
 def build_project(content, dest="./dist", title="better code"):
     os.makedirs(dest, exist_ok=True)
     
-    with open(f"{dest}/index.html", "w") as f:
+    with open(f"{dest}/index.html", "w", encoding='utf-8') as f:
         f.write(f"""
         <!DOCTYPE html>
             <html>
             <head>
-                <link rel="stylesheet" href="/katex.min.css">
-                <script defer src="/katex.min.js"></script>
+                <link rel="stylesheet" href="/lib/katex.min.css">
+                <script defer src="/lib/katex.min.js"></script>
                 
                 <link rel="stylesheet" href="/style.css">
                 <script defer src="/script.js"></script>
@@ -321,8 +331,8 @@ def build_project(content, dest="./dist", title="better code"):
         
     shutil.copyfile("./src/browser/script.js", f"{dest}/script.js")
     shutil.copyfile("./src/browser/style.css", f"{dest}/style.css")
-    shutil.copyfile("./node_modules/katex/dist/katex.min.js", f"{dest}/katex.min.js")
-    shutil.copyfile("./node_modules/katex/dist/katex.min.css", f"{dest}/katex.min.css")
+    shutil.copytree("./node_modules/katex/dist/", f"{dest}/lib/", dirs_exist_ok=True)
+    shutil.copytree("./assets/", f"{dest}/assets/", dirs_exist_ok=True)
     
     print(f"\n:: now serve a simple http server at {dest} ::")
             
@@ -348,8 +358,10 @@ def mm2(obj, args):
 
 if __name__ == "__main__":
     rules = [
-        Name(r"(\w+?)__(\w+)", lambda m: BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")),
-        Name(r"delta_(\w+)",   lambda m: BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")),
+        Name(r"(\w+?)__(\w+)",  lambda m: [BetterCode.Node.math(f"{'{'}{m.group(1)}{'}'}_{'{'}{m.group(2)}{'}'}")]),
+        Name(r"delta_(\w+)",    lambda m: [BetterCode.Node.math(f"\\Delta {'{'}{m.group(1)}{'}'}")]),
+        Name(r"(\w*)firefox(\w*)",   lambda m: [BetterCode.Node.math(escape_for_katex(m.group(1))), BetterCode.Node.img("firefox.png"), BetterCode.Node.math(escape_for_katex(m.group(2)))]),
+        Name(r"(\w*)mouse(\w*)",   lambda m: [BetterCode.Node.math(escape_for_katex(m.group(1))), BetterCode.Node.text("🖱"), BetterCode.Node.math(escape_for_katex(m.group(2)))]),
 
         Method("dot", mm1),
         Method("mul", mm2),
@@ -365,7 +377,7 @@ if __name__ == "__main__":
     tree = parso.parse(code)
     print(tree.dump())
     
-    ir  = to_IR(tree, rules)
+    ir  = to_IR(tree, rules, None, None)
     print(ir)
     
     out = to_html(ir)
