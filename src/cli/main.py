@@ -315,8 +315,8 @@ def build_project(content, dest="./dist", title="better code"):
         <!DOCTYPE html>
             <html>
             <head>
-                <link rel="stylesheet" href="/lib/katex.min.css">
-                <script defer src="/lib/katex.min.js"></script>
+                <link rel="stylesheet" href="/lib/katex/katex.min.css">
+                <script defer src="/lib/katex/katex.min.js"></script>
                 
                 <link rel="stylesheet" href="/style.css">
                 <script defer src="/script.js"></script>
@@ -331,7 +331,7 @@ def build_project(content, dest="./dist", title="better code"):
         
     shutil.copyfile("./src/browser/script.js", f"{dest}/script.js")
     shutil.copyfile("./src/browser/style.css", f"{dest}/style.css")
-    shutil.copytree("./node_modules/katex/dist/", f"{dest}/lib/", dirs_exist_ok=True)
+    shutil.copytree("./node_modules/katex/dist/", f"{dest}/lib/katex/", dirs_exist_ok=True)
     shutil.copytree("./assets/", f"{dest}/assets/", dirs_exist_ok=True)
     
     print(f"\n:: now serve a simple http server at {dest} ::")
